@@ -20,6 +20,12 @@ pub async fn create_tables(pool: &SqlitePool) -> Result<()> {
             id TEXT PRIMARY KEY,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+            first_name TEXT,
+            last_name TEXT,
+            phone TEXT,
+            membership_id TEXT,
+            membership_level TEXT NOT NULL DEFAULT 'Bronze',
+            points INTEGER NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL
         )

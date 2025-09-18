@@ -3,10 +3,14 @@ use axum::{
     http::StatusCode,
     response::Json as ResponseJson,
 };
+use axum_extra::{
+    headers::{authorization::Bearer, Authorization},
+    TypedHeader,
+};
 use bcrypt::{hash, verify, DEFAULT_COST};
 
 use crate::{
-    models::{AuthResponse, ErrorResponse, LoginRequest, RegisterRequest},
+    models::{AuthResponse, ErrorResponse, LoginRequest, RegisterRequest, UserProfile, UpdateProfileRequest},
     AppState,
 };
 
@@ -213,6 +217,106 @@ pub async fn login(
         user_id: user.id,
         email: user.email,
     }))
+}
+
+/// Get user profile
+#[utoipa::path(
+    get,
+    path = "/profile",
+    responses(
+        (status = 200, description = "Profile retrieved successfully", body = UserProfile),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "User not found", body = ErrorResponse)
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn get_profile(
+    State(state): State<AppState>,
+    TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
+) -> Result<ResponseJson<UserProfile>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    // Verify JWT token
+    let claims = match state.jwt_service.verify_token(authorization.token()) {
+        Ok(claims) => claims,
+        Err(_) => {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                ResponseJson(ErrorResponse {
+                    error: "invalid_token".to_string(),
+                    message: "Invalid or expired token".to_string(),
+                }),
+            ));
+        }
+    };
+
+    // Get user profile
+    match state.user_repo.get_profile(&claims.sub).await {
+        Ok(Some(profile)) => Ok(ResponseJson(profile)),
+        Ok(None) => Err((
+            StatusCode::NOT_FOUND,
+            ResponseJson(ErrorResponse {
+                error: "user_not_found".to_string(),
+                message: "User not found".to_string(),
+            }),
+        )),
+        Err(_) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            ResponseJson(ErrorResponse {
+                error: "database_error".to_string(),
+                message: "Failed to retrieve profile".to_string(),
+            }),
+        )),
+    }
+}
+
+/// Update user profile
+#[utoipa::path(
+    put,
+    path = "/profile",
+    request_body = UpdateProfileRequest,
+    responses(
+        (status = 200, description = "Profile updated successfully", body = UserProfile),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "User not found", body = ErrorResponse)
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn update_profile(
+    State(state): State<AppState>,
+    TypedHeader(authorization): TypedHeader<Authorization<Bearer>>,
+    Json(payload): Json<UpdateProfileRequest>,
+) -> Result<ResponseJson<UserProfile>, (StatusCode, ResponseJson<ErrorResponse>)> {
+    // Verify JWT token
+    let claims = match state.jwt_service.verify_token(authorization.token()) {
+        Ok(claims) => claims,
+        Err(_) => {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                ResponseJson(ErrorResponse {
+                    error: "invalid_token".to_string(),
+                    message: "Invalid or expired token".to_string(),
+                }),
+            ));
+        }
+    };
+
+    // Update user profile
+    match state.user_repo.update_profile(&claims.sub, &payload).await {
+        Ok(Some(profile)) => Ok(ResponseJson(profile)),
+        Ok(None) => Err((
+            StatusCode::NOT_FOUND,
+            ResponseJson(ErrorResponse {
+                error: "user_not_found".to_string(),
+                message: "User not found".to_string(),
+            }),
+        )),
+        Err(_) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            ResponseJson(ErrorResponse {
+                error: "database_error".to_string(),
+                message: "Failed to update profile".to_string(),
+            }),
+        )),
+    }
 }
 
 #[cfg(test)]

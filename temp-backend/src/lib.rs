@@ -9,7 +9,7 @@ mod test_helpers;
 
 use axum::{
     http::Method,
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
     response::Html,
 };
@@ -19,9 +19,9 @@ use utoipa::OpenApi;
 
 use crate::{
     database::{create_pool, create_tables},
-    handlers::{login, register},
+    handlers::{login, register, get_profile, update_profile},
     jwt::JwtService,
-    models::{AuthResponse, ErrorResponse, LoginRequest, RegisterRequest},
+    models::{AuthResponse, ErrorResponse, LoginRequest, RegisterRequest, UserProfile, UpdateProfileRequest},
     repository::UserRepository,
 };
 
@@ -36,20 +36,44 @@ pub struct AppState {
     paths(
         handlers::register,
         handlers::login,
+        handlers::get_profile,
+        handlers::update_profile,
     ),
     components(
-        schemas(RegisterRequest, LoginRequest, AuthResponse, ErrorResponse)
+        schemas(RegisterRequest, LoginRequest, AuthResponse, ErrorResponse, UserProfile, UpdateProfileRequest)
     ),
     tags(
-        (name = "auth", description = "Authentication API")
+        (name = "auth", description = "Authentication API"),
+        (name = "profile", description = "User Profile API")
     ),
     info(
-        title = "Authentication API",
-        description = "A simple authentication API with JWT tokens",
+        title = "User Management API",
+        description = "A complete user management API with authentication and profiles",
         version = "1.0.0"
-    )
+    ),
+    modifiers(&SecurityAddon)
 )]
 struct ApiDoc;
+
+use utoipa::Modify;
+
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        let components = openapi.components.as_mut().unwrap();
+        use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+        components.add_security_scheme(
+            "bearer_auth",
+            SecurityScheme::Http(
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("JWT")
+                    .build(),
+            ),
+        );
+    }
+}
 
 pub async fn create_app() -> Result<Router, Box<dyn std::error::Error>> {
     // Initialize database
@@ -67,7 +91,7 @@ pub async fn create_app() -> Result<Router, Box<dyn std::error::Error>> {
 
     // Setup CORS
     let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST])
+        .allow_methods([Method::GET, Method::POST, Method::PUT])
         .allow_headers(Any)
         .allow_origin(Any);
 
@@ -76,6 +100,8 @@ pub async fn create_app() -> Result<Router, Box<dyn std::error::Error>> {
         .route("/", get(hello_handler))
         .route("/auth/register", post(register))
         .route("/auth/login", post(login))
+        .route("/profile", get(get_profile))
+        .route("/profile", put(update_profile))
         .route("/api-docs/openapi.json", get(|| async {
             axum::Json(ApiDoc::openapi())
         }))
@@ -88,10 +114,12 @@ pub async fn create_app() -> Result<Router, Box<dyn std::error::Error>> {
 
 async fn hello_handler() -> axum::Json<serde_json::Value> {
     axum::Json(serde_json::json!({
-        "message": "Authentication API is running!",
+        "message": "User Management API is running!",
         "endpoints": {
             "register": "POST /auth/register",
             "login": "POST /auth/login",
+            "get_profile": "GET /profile",
+            "update_profile": "PUT /profile",
             "api_docs": "GET /api-docs/openapi.json",
             "swagger_ui": "GET /swagger-ui"
         }
@@ -105,7 +133,7 @@ async fn swagger_ui() -> Html<&'static str> {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Authentication API Documentation</title>
+  <title>User Management API Documentation</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css" />
 </head>
 <body>

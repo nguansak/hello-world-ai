@@ -8,6 +8,12 @@ pub struct User {
     pub id: String,
     pub email: String,
     pub password_hash: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub phone: Option<String>,
+    pub membership_id: Option<String>,
+    pub membership_level: String, // Bronze, Silver, Gold, Platinum
+    pub points: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -29,6 +35,26 @@ pub struct AuthResponse {
     pub token: String,
     pub user_id: String,
     pub email: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow, ToSchema)]
+pub struct UserProfile {
+    pub id: String,
+    pub email: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub phone: Option<String>,
+    pub membership_id: Option<String>,
+    pub membership_level: String,
+    pub points: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct UpdateProfileRequest {
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub phone: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
