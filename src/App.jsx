@@ -6,7 +6,7 @@ function App() {
   const [count, setCount] = useState(0)
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8">
+    <div className="bg-gray-100 min-h-screen flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="flex gap-8 mb-8">
         <a href="https://vite.dev" target="_blank">
           <img src={viteLogo} className="h-24 p-6 transition-all duration-300 hover:drop-shadow-lg" alt="Vite logo" />
@@ -16,7 +16,7 @@ function App() {
         </a>
       </div>
       <h1 className="text-4xl font-bold text-gray-800 mb-8">Hello KBTG</h1>
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-6xl">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-auto">
         <button 
           onClick={() => setCount((count) => count + 1)}
           className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors mb-4"
