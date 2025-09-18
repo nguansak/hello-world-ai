@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
+import Datepicker from './components/Datepicker'
 
 function App() {
   const [count, setCount] = useState(0)
@@ -17,6 +18,12 @@ function App() {
       </div>
       <h1 className="text-4xl font-bold text-gray-800 mb-8">Hello KBTG</h1>
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-auto">
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Select a date:
+          </label>
+          <Datepicker />
+        </div>
         <button 
           onClick={() => setCount((count) => count + 1)}
           className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors mb-4"
