@@ -214,3 +214,282 @@ pub async fn login(
         email: user.email,
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        models::{LoginRequest, RegisterRequest},
+        test_helpers::create_test_app_state,
+    };
+    use axum::{
+        extract::{Json, State},
+        http::StatusCode,
+    };
+
+    #[tokio::test]
+    async fn test_register_success() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        let request = RegisterRequest {
+            email: "test@example.com".to_string(),
+            password: "password123".to_string(),
+        };
+
+        let result = register(State(app_state), Json(request)).await;
+        
+        assert!(result.is_ok());
+        let (status, response) = result.unwrap();
+        assert_eq!(status, StatusCode::CREATED);
+        assert_eq!(response.email, "test@example.com");
+        assert!(!response.token.is_empty());
+        assert!(!response.user_id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_register_empty_email() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        let request = RegisterRequest {
+            email: "".to_string(),
+            password: "password123".to_string(),
+        };
+
+        let result = register(State(app_state), Json(request)).await;
+        
+        assert!(result.is_err());
+        let (status, response) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(response.error, "validation_error");
+        assert_eq!(response.message, "Email and password are required");
+    }
+
+    #[tokio::test]
+    async fn test_register_empty_password() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        let request = RegisterRequest {
+            email: "test@example.com".to_string(),
+            password: "".to_string(),
+        };
+
+        let result = register(State(app_state), Json(request)).await;
+        
+        assert!(result.is_err());
+        let (status, response) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(response.error, "validation_error");
+        assert_eq!(response.message, "Email and password are required");
+    }
+
+    #[tokio::test]
+    async fn test_register_short_password() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        let request = RegisterRequest {
+            email: "test@example.com".to_string(),
+            password: "123".to_string(),
+        };
+
+        let result = register(State(app_state), Json(request)).await;
+        
+        assert!(result.is_err());
+        let (status, response) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(response.error, "validation_error");
+        assert_eq!(response.message, "Password must be at least 6 characters long");
+    }
+
+    #[tokio::test]
+    async fn test_register_duplicate_email() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        // First registration
+        let request1 = RegisterRequest {
+            email: "test@example.com".to_string(),
+            password: "password123".to_string(),
+        };
+        let _ = register(State(app_state.clone()), Json(request1)).await.unwrap();
+
+        // Second registration with same email
+        let request2 = RegisterRequest {
+            email: "test@example.com".to_string(),
+            password: "password456".to_string(),
+        };
+        let result = register(State(app_state), Json(request2)).await;
+        
+        assert!(result.is_err());
+        let (status, response) = result.unwrap_err();
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(response.error, "email_exists");
+        assert_eq!(response.message, "Email already exists");
+    }
+
+    #[tokio::test]
+    async fn test_login_success() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        // First register a user
+        let register_request = RegisterRequest {
+            email: "test@example.com".to_string(),
+            password: "password123".to_string(),
+        };
+        let _ = register(State(app_state.clone()), Json(register_request)).await.unwrap();
+
+        // Then login
+        let login_request = LoginRequest {
+            email: "test@example.com".to_string(),
+            password: "password123".to_string(),
+        };
+        let result = login(State(app_state), Json(login_request)).await;
+        
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.email, "test@example.com");
+        assert!(!response.token.is_empty());
+        assert!(!response.user_id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_login_empty_email() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        let request = LoginRequest {
+            email: "".to_string(),
+            password: "password123".to_string(),
+        };
+
+        let result = login(State(app_state), Json(request)).await;
+        
+        assert!(result.is_err());
+        let (status, response) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(response.error, "validation_error");
+        assert_eq!(response.message, "Email and password are required");
+    }
+
+    #[tokio::test]
+    async fn test_login_empty_password() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        let request = LoginRequest {
+            email: "test@example.com".to_string(),
+            password: "".to_string(),
+        };
+
+        let result = login(State(app_state), Json(request)).await;
+        
+        assert!(result.is_err());
+        let (status, response) = result.unwrap_err();
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(response.error, "validation_error");
+        assert_eq!(response.message, "Email and password are required");
+    }
+
+    #[tokio::test]
+    async fn test_login_user_not_found() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        let request = LoginRequest {
+            email: "nonexistent@example.com".to_string(),
+            password: "password123".to_string(),
+        };
+
+        let result = login(State(app_state), Json(request)).await;
+        
+        assert!(result.is_err());
+        let (status, response) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(response.error, "invalid_credentials");
+        assert_eq!(response.message, "Invalid email or password");
+    }
+
+    #[tokio::test]
+    async fn test_login_wrong_password() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        // First register a user
+        let register_request = RegisterRequest {
+            email: "test@example.com".to_string(),
+            password: "password123".to_string(),
+        };
+        let _ = register(State(app_state.clone()), Json(register_request)).await.unwrap();
+
+        // Then login with wrong password
+        let login_request = LoginRequest {
+            email: "test@example.com".to_string(),
+            password: "wrongpassword".to_string(),
+        };
+        let result = login(State(app_state), Json(login_request)).await;
+        
+        assert!(result.is_err());
+        let (status, response) = result.unwrap_err();
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(response.error, "invalid_credentials");
+        assert_eq!(response.message, "Invalid email or password");
+    }
+
+    #[tokio::test]
+    async fn test_jwt_token_validation() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        // Register and get token
+        let register_request = RegisterRequest {
+            email: "test@example.com".to_string(),
+            password: "password123".to_string(),
+        };
+        let (_, register_response) = register(State(app_state.clone()), Json(register_request)).await.unwrap();
+
+        // Verify token can be decoded
+        let claims = app_state.jwt_service.verify_token(&register_response.token);
+        assert!(claims.is_ok());
+        
+        let claims = claims.unwrap();
+        assert_eq!(claims.email, "test@example.com");
+        assert_eq!(claims.sub, register_response.user_id);
+    }
+
+    #[tokio::test]
+    async fn test_password_hashing() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        // Register a user
+        let register_request = RegisterRequest {
+            email: "test@example.com".to_string(),
+            password: "password123".to_string(),
+        };
+        let (_, register_response) = register(State(app_state.clone()), Json(register_request)).await.unwrap();
+
+        // Verify password is hashed in database
+        let user = app_state.user_repo.find_by_email("test@example.com").await.unwrap().unwrap();
+        assert_ne!(user.password_hash, "password123"); // Should be hashed, not plain text
+        assert!(user.password_hash.starts_with("$2b$")); // bcrypt hash format
+    }
+
+    #[tokio::test]
+    async fn test_register_login_flow() {
+        let app_state = create_test_app_state().await.unwrap();
+        
+        // Register
+        let register_request = RegisterRequest {
+            email: "user@example.com".to_string(),
+            password: "mypassword123".to_string(),
+        };
+        let (register_status, register_response) = register(State(app_state.clone()), Json(register_request)).await.unwrap();
+        
+        assert_eq!(register_status, StatusCode::CREATED);
+        assert_eq!(register_response.email, "user@example.com");
+        
+        // Login
+        let login_request = LoginRequest {
+            email: "user@example.com".to_string(),
+            password: "mypassword123".to_string(),
+        };
+        let login_response = login(State(app_state), Json(login_request)).await.unwrap();
+        
+        assert_eq!(login_response.email, "user@example.com");
+        assert_eq!(login_response.user_id, register_response.user_id); // Same user ID
+        // Different tokens (new token generated on login)
+        assert_ne!(login_response.token, register_response.token);
+    }
+}
